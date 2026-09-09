@@ -1,0 +1,24 @@
+import express from "express";
+import cookieParser from "cookie-parser";
+import healthRoutes from "./routes/health.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import userRoutes from "./routes/user.routes.js";
+import organizationRoutes from "./routes/organization.routes.js";
+import teamRoutes from "./routes/team.routes.js";
+import ticketRoutes from "./routes/ticket.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
+import slaRoutes from "./routes/sla.routes.js";
+
+const app = express();
+
+app.use(express.json());
+app.use(cookieParser());
+app.use("/api/v1/health", healthRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/organizations", organizationRoutes);
+app.use("/api/v1/teams", teamRoutes);
+app.use("/api/v1/tickets", ticketRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/sla", slaRoutes);
+export default app;
