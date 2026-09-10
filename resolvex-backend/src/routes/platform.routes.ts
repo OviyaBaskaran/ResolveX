@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { listOrganizations, platformLogin, updateOrganizationStatus } from "../controllers/platform.controller.js";
 import { requirePlatformAdmin } from "../middlewares/platform-auth.middleware.js";
+import { credentialRateLimit } from "../middlewares/rate-limit.middleware.js";
 
 const router = Router();
 
-router.post("/auth/login", platformLogin);
+router.post("/auth/login", credentialRateLimit, platformLogin);
 router.get("/organizations", requirePlatformAdmin, listOrganizations);
 router.patch("/organizations/:organizationId/status", requirePlatformAdmin, updateOrganizationStatus);
 

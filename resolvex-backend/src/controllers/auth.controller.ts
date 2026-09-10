@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from "../validations/auth.validation.js";
 import { loginUser, refreshUserSession, registerUser, requestPasswordReset, resetPassword, revokeRefreshToken } from "../services/auth.service.js";
+import { sendPasswordResetEmail } from "../services/email.service.js";
 
 const refreshCookieOptions = {
   httpOnly: true,
@@ -123,17 +124,23 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  const token = await requestPasswordReset(result.data);
-  const response: { success: true; message: string; data?: { resetToken: string } } = {
-    success: true,
-    message: "If the account exists, password reset instructions will be sent"
-  };
+  try {
+    const reset = await requestPasswordReset(result.data);
+    if (reset) await sendPasswordResetEmail(reset.recipient, reset.token);
 
-  if (token && process.env.NODE_ENV !== "production") {
-    response.data = { resetToken: token };
+    const response: { success: true; message: string; data?: { resetToken: string } } = {
+      success: true,
+      message: "If the account exists, password reset instructions will be sent"
+    };
+    if (reset && process.env.NODE_ENV !== "production") response.data = { resetToken: reset.token };
+    res.status(200).json(response);
+  } catch (error) {
+    if (error instanceof Error && error.message === "EMAIL_NOT_CONFIGURED") {
+      res.status(503).json({ success: false, message: "Password reset email is not configured", code: "EMAIL_NOT_CONFIGURED" });
+      return;
+    }
+    res.status(502).json({ success: false, message: "Password reset email could not be delivered", code: "EMAIL_DELIVERY_FAILED" });
   }
-
-  res.status(200).json(response);
 };
 
 export const completePasswordReset = async (req: Request, res: Response): Promise<void> => {

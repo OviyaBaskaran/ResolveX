@@ -17,9 +17,13 @@ export const listComments = async (req: Request, res: Response): Promise<void> =
   }
 
   try {
-    const comments = await listTicketComments(ticketId, req.user.organizationId);
+    const comments = await listTicketComments(ticketId, req.user.organizationId, req.user.id, req.user.roleCode);
     res.status(200).json({ success: true, data: { comments } });
   } catch (error) {
+    if (error instanceof Error && error.message === "TICKET_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "Ticket not found", code: "TICKET_NOT_FOUND" });
+      return;
+    }
     res.status(500).json({ success: false, message: "Internal server error", code: "INTERNAL_SERVER_ERROR" });
   }
 };
@@ -39,12 +43,16 @@ export const createComment = async (req: Request, res: Response): Promise<void> 
   }
 
   try {
-    const comment = await createTicketComment(ticketId, req.user.organizationId, req.user.id, result.data);
+    const comment = await createTicketComment(ticketId, req.user.organizationId, req.user.id, req.user.roleCode, result.data);
     res.status(201).json({ success: true, message: "Comment created", data: { comment } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     if (code === "TICKET_NOT_FOUND") {
       res.status(404).json({ success: false, message: "Ticket not found", code });
+      return;
+    }
+    if (code === "INTERNAL_COMMENT_FORBIDDEN") {
+      res.status(403).json({ success: false, message: "Customers cannot create internal comments", code });
       return;
     }
     res.status(500).json({ success: false, message: "Internal server error", code: "INTERNAL_SERVER_ERROR" });

@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { completePasswordReset, forgotPassword, login, logout, refresh, register } from "../controllers/auth.controller.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
+import { credentialRateLimit } from "../middlewares/rate-limit.middleware.js";
 
 const router = Router();
 
-router.post("/login", login);
+router.post("/login", credentialRateLimit, login);
 router.post("/register", register);
-router.post("/forgot-password", forgotPassword);
+router.post("/forgot-password", credentialRateLimit, forgotPassword);
 router.post("/reset-password", completePasswordReset);
 router.post("/refresh", refresh);
 router.post("/logout", logout);

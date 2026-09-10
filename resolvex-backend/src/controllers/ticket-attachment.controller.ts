@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import cloudinary from "../config/cloudinary.js";
 import { createTicketAttachment, listTicketAttachments } from "../services/ticket-attachment.service.js";
+import { assertTicketAccess } from "../services/ticket-access.service.js";
 import { createTicketAttachmentSchema } from "../validations/ticket-attachment.validation.js";
 
 const parseTicketId = (value: string | string[] | undefined): number => Number(Array.isArray(value) ? value[0] : value);
@@ -43,9 +44,13 @@ export const listAttachments = async (req: Request, res: Response): Promise<void
   }
 
   try {
-    const attachments = await listTicketAttachments(ticketId, req.user.organizationId);
+    const attachments = await listTicketAttachments(ticketId, req.user.organizationId, req.user.id, req.user.roleCode);
     res.status(200).json({ success: true, data: { attachments } });
   } catch (error) {
+    if (error instanceof Error && error.message === "TICKET_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "Ticket not found", code: "TICKET_NOT_FOUND" });
+      return;
+    }
     res.status(500).json({ success: false, message: "Internal server error", code: "INTERNAL_SERVER_ERROR" });
   }
 };
@@ -63,6 +68,7 @@ export const createAttachment = async (req: Request, res: Response): Promise<voi
   }
 
   try {
+    await assertTicketAccess(ticketId, req.user.organizationId, req.user.id, req.user.roleCode);
     const file = req.file;
     if (!file) {
       res.status(400).json({ success: false, message: "File is required", code: "FILE_REQUIRED" });
@@ -89,7 +95,7 @@ export const createAttachment = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const attachment = await createTicketAttachment(ticketId, req.user.organizationId, req.user.id, result.data);
+    const attachment = await createTicketAttachment(ticketId, req.user.organizationId, req.user.id, req.user.roleCode, result.data);
     res.status(201).json({ success: true, message: "Attachment uploaded", data: { attachment } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";

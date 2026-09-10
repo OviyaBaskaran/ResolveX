@@ -6,6 +6,7 @@ import {
   listSlaPolicies,
   updateSlaPolicy
 } from "../services/sla.service.js";
+import { assertTicketAccess } from "../services/ticket-access.service.js";
 import { createSlaPolicySchema, updateSlaPolicySchema } from "../validations/sla.validation.js";
 
 const parseId = (value: string | string[] | undefined): number => Number(Array.isArray(value) ? value[0] : value);
@@ -80,13 +81,18 @@ export const getTicketSlaStatus = async (req: Request, res: Response): Promise<v
     return;
   }
   try {
+    await assertTicketAccess(ticketId, req.user.organizationId, req.user.id, req.user.roleCode);
     const sla = await getTicketSla(ticketId, req.user.organizationId);
     if (!sla) {
       res.status(404).json({ success: false, message: "SLA record not found", code: "SLA_NOT_FOUND" });
       return;
     }
     res.status(200).json({ success: true, data: { sla } });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "TICKET_NOT_FOUND") {
+      res.status(404).json({ success: false, message: "Ticket not found", code: "TICKET_NOT_FOUND" });
+      return;
+    }
     res.status(500).json({ success: false, message: "Internal server error", code: "INTERNAL_SERVER_ERROR" });
   }
 };

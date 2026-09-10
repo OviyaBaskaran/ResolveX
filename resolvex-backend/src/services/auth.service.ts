@@ -25,6 +25,8 @@ type PasswordResetTokenRow = {
   tokenHash: string;
 };
 
+type PasswordResetRecipient = { id: number; name: string; email: string };
+
 const invalidCredentials = (): never => {
   throw new Error("INVALID_CREDENTIALS");
 };
@@ -227,10 +229,10 @@ const hashResetToken = (token: string): string =>
 export const requestPasswordReset = async (input: {
   organizationSlug: string;
   email: string;
-}): Promise<string | undefined> => {
+}): Promise<{ token: string; recipient: PasswordResetRecipient } | undefined> => {
   const [rows] = await pool.query(
     `
-      SELECT u.id
+      SELECT u.id, u.name, u.email
       FROM users u
       INNER JOIN organizations o ON o.id = u.organization_id
       WHERE u.email = ?
@@ -241,7 +243,7 @@ export const requestPasswordReset = async (input: {
     `,
     [input.email.toLowerCase(), input.organizationSlug]
   );
-  const user = (rows as { id: number }[])[0];
+  const user = (rows as PasswordResetRecipient[])[0];
 
   if (!user) {
     return undefined;
@@ -264,7 +266,7 @@ export const requestPasswordReset = async (input: {
     [user.id, hashResetToken(token)]
   );
 
-  return token;
+  return { token, recipient: user };
 };
 
 export const resetPassword = async (token: string, password: string): Promise<void> => {

@@ -1,11 +1,14 @@
 import pool from "../config/database.js";
+import { assertTicketAccess } from "./ticket-access.service.js";
 
 type CreateTicketCommentInput = {
   body: string;
   type: "CUSTOMER" | "INTERNAL";
 };
 
-export const listTicketComments = async (ticketId: number, organizationId: number) => {
+export const listTicketComments = async (ticketId: number, organizationId: number, userId: number, roleCode: string) => {
+  await assertTicketAccess(ticketId, organizationId, userId, roleCode);
+  const internalFilter = roleCode === "CUSTOMER" ? " AND tc.type = 'CUSTOMER'" : "";
   const [rows] = await pool.query(
     `
       SELECT
@@ -23,7 +26,7 @@ export const listTicketComments = async (ticketId: number, organizationId: numbe
       INNER JOIN users u ON u.id = tc.user_id
       INNER JOIN roles r ON r.id = u.role_id
       WHERE tc.ticket_id = ?
-        AND tc.organization_id = ?
+        AND tc.organization_id = ?${internalFilter}
       ORDER BY tc.created_at ASC
     `,
     [ticketId, organizationId]
@@ -36,15 +39,12 @@ export const createTicketComment = async (
   ticketId: number,
   organizationId: number,
   userId: number,
+  roleCode: string,
   input: CreateTicketCommentInput
 ) => {
-  const [ticketRows] = await pool.query(
-    `SELECT id FROM tickets WHERE id = ? AND organization_id = ? LIMIT 1`,
-    [ticketId, organizationId]
-  );
-
-  if ((ticketRows as { id: number }[]).length === 0) {
-    throw new Error("TICKET_NOT_FOUND");
+  await assertTicketAccess(ticketId, organizationId, userId, roleCode);
+  if (input.type === "INTERNAL" && roleCode === "CUSTOMER") {
+    throw new Error("INTERNAL_COMMENT_FORBIDDEN");
   }
 
   const [result] = await pool.query(

@@ -1,4 +1,5 @@
 import pool from "../config/database.js";
+import { assertTicketAccess } from "./ticket-access.service.js";
 
 export type CreateTicketAttachmentInput = {
   fileName: string;
@@ -8,7 +9,8 @@ export type CreateTicketAttachmentInput = {
   publicId: string;
 };
 
-export const listTicketAttachments = async (ticketId: number, organizationId: number) => {
+export const listTicketAttachments = async (ticketId: number, organizationId: number, userId: number, roleCode: string) => {
+  await assertTicketAccess(ticketId, organizationId, userId, roleCode);
   const [rows] = await pool.query(
     `
       SELECT
@@ -42,16 +44,10 @@ export const createTicketAttachment = async (
   ticketId: number,
   organizationId: number,
   uploadedBy: number,
+  roleCode: string,
   input: CreateTicketAttachmentInput
 ) => {
-  const [ticketRows] = await pool.query(
-    `SELECT id FROM tickets WHERE id = ? AND organization_id = ? LIMIT 1`,
-    [ticketId, organizationId]
-  );
-
-  if ((ticketRows as { id: number }[]).length === 0) {
-    throw new Error("TICKET_NOT_FOUND");
-  }
+  await assertTicketAccess(ticketId, organizationId, uploadedBy, roleCode);
 
   const [result] = await pool.query(
     `
