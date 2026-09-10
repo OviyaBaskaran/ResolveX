@@ -14,4 +14,5 @@ export type AccessTokenPayload = {
   organizationId: number;
   roleId: number;
   roleCode: string;
+  tokenType?: "ORGANIZATION_USER" | "PLATFORM_ADMIN";
 };

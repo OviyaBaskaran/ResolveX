@@ -40,6 +40,9 @@ const seed = async (): Promise<void> => {
   const adminName = requiredSeedEnv("SEED_ADMIN_NAME");
   const adminEmail = requiredSeedEnv("SEED_ADMIN_EMAIL");
   const adminPassword = requiredSeedEnv("SEED_ADMIN_PASSWORD");
+  const platformAdminEmail = process.env.SEED_PLATFORM_ADMIN_EMAIL;
+  const platformAdminName = process.env.SEED_PLATFORM_ADMIN_NAME;
+  const platformAdminPassword = process.env.SEED_PLATFORM_ADMIN_PASSWORD;
 
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
@@ -81,9 +84,10 @@ const seed = async (): Promise<void> => {
         `
           INSERT INTO organizations (
             name,
-            slug
+            slug,
+            status
           )
-          VALUES (?, ?)
+          VALUES (?, ?, 'ACTIVE')
         `,
         [organizationName, organizationSlug]
       );
@@ -206,6 +210,23 @@ const seed = async (): Promise<void> => {
       );
 
       console.log(`Admin user created: ${adminEmail}`);
+    }
+
+    if (platformAdminEmail && platformAdminName && platformAdminPassword) {
+      const platformPasswordHash = await bcrypt.hash(platformAdminPassword, 12);
+      const [existingPlatformAdmins] = await connection.query(
+        "SELECT id FROM platform_admins WHERE email = ? LIMIT 1",
+        [platformAdminEmail.toLowerCase()]
+      );
+      if ((existingPlatformAdmins as { id: number }[]).length === 0) {
+        await connection.query(
+          `INSERT INTO platform_admins (name, email, password_hash, status) VALUES (?, ?, ?, 'ACTIVE')`,
+          [platformAdminName, platformAdminEmail.toLowerCase(), platformPasswordHash]
+        );
+        console.log(`Platform admin created: ${platformAdminEmail}`);
+      } else {
+        console.log(`Platform admin already exists: ${platformAdminEmail}`);
+      }
     }
 
     // --------------------------------------------------

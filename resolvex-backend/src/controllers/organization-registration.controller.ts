@@ -10,7 +10,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
   try {
     const admin = await registerOrganization(result.data);
-    res.status(201).json({ success: true, message: "Organization registered", data: { organizationId: admin.organizationId, admin } });
+    res.status(201).json({
+      success: true,
+      message: "Organization registered and pending platform approval",
+      data: { organizationId: admin.organizationId, status: "PENDING", admin }
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "ORGANIZATION_ALREADY_EXISTS") {
       res.status(409).json({ success: false, message: "Organization slug or admin email already exists", code: "ORGANIZATION_ALREADY_EXISTS" });

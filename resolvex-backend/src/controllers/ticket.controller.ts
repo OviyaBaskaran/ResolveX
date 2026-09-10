@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { assignTicket, createTicket, getTicketById, listTickets, updateTicketStatus } from "../services/ticket.service.js";
 import { assignTicketSchema, createTicketSchema, updateTicketStatusSchema } from "../validations/ticket.validation.js";
+import { listTicketsQuerySchema } from "../validations/ticket-list.validation.js";
 
 const paramId = (value: string | string[] | undefined): number => Number(Array.isArray(value) ? value[0] : value);
 const staffRoles = ["SUPPORT_AGENT", "MANAGER", "ORGANIZATION_ADMIN"];
@@ -17,8 +18,13 @@ export const create = async (req: Request, res: Response): Promise<void> => {
 
 export const list = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) { res.status(401).json({ success: false, message: "Authentication required", code: "UNAUTHENTICATED" }); return; }
-  const tickets = await listTickets(req.user.organizationId, req.user.id, req.user.roleCode);
-  res.status(200).json({ success: true, data: { tickets } });
+  const result = listTicketsQuerySchema.safeParse(req.query);
+  if (!result.success) {
+    res.status(400).json({ success: false, message: "Validation failed", code: "VALIDATION_ERROR", errors: result.error.flatten().fieldErrors });
+    return;
+  }
+  const data = await listTickets(req.user.organizationId, req.user.id, req.user.roleCode, result.data);
+  res.status(200).json({ success: true, data });
 };
 
 export const get = async (req: Request, res: Response): Promise<void> => {

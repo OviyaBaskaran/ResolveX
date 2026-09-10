@@ -15,7 +15,10 @@ export const registerOrganization = async (input: {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const [organizationResult] = await connection.query("INSERT INTO organizations (name, slug) VALUES (?, ?)", [input.organizationName, input.organizationSlug]);
+    const [organizationResult] = await connection.query(
+      "INSERT INTO organizations (name, slug, status) VALUES (?, ?, 'PENDING')",
+      [input.organizationName, input.organizationSlug]
+    );
     const organizationId = Number((organizationResult as { insertId: number }).insertId);
     const roleIds = new Map<string, number>();
     for (const [name, code] of roles) {

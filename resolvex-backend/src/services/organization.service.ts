@@ -4,7 +4,7 @@ export type Organization = {
   id: number;
   name: string;
   slug: string;
-  status: "ACTIVE" | "DISABLED";
+  status: "PENDING" | "ACTIVE" | "DISABLED";
 };
 
 export const getOrganizationById = async (organizationId: number): Promise<Organization | undefined> => {

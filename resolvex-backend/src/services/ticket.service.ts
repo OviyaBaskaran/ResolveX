@@ -1,6 +1,8 @@
 import pool from "../config/database.js";
 import { createNotification, notifyOrganizationStaff } from "./notification.service.js";
 import { createTicketSlaIfConfigured } from "./sla.service.js";
+import { createAuditLog } from "./audit-log.service.js";
+import type { ListTicketsQuery } from "../validations/ticket-list.validation.js";
 
 type CreateTicketInput = { subject: string; description: string; priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" };
 type AssignmentInput = { teamId: number | null; assigneeId: number | null };
@@ -29,25 +31,86 @@ export const createTicket = async (input: CreateTicketInput, organizationId: num
   } catch (error) {
     console.error("Ticket creation notification failed:", error);
   }
+  try {
+    await createAuditLog(organizationId, {
+      actorId: customerId,
+      action: "TICKET_CREATED",
+      entityType: "TICKET",
+      entityId: ticketId,
+      metadata: { priority: input.priority, subject: input.subject }
+    });
+  } catch (error) {
+    console.error("Ticket creation audit failed:", error);
+  }
 
   return getTicketById(ticketId, organizationId, customerId, false);
 };
 
-export const listTickets = async (organizationId: number, userId: number, roleCode: string) => {
-  const customerFilter = staffRoles.includes(roleCode) ? "" : " AND t.customer_id = ?";
-  const params = staffRoles.includes(roleCode) ? [organizationId] : [organizationId, userId];
+export const listTickets = async (
+  organizationId: number,
+  userId: number,
+  roleCode: string,
+  query: ListTicketsQuery
+) => {
+  const conditions = ["t.organization_id = ?"];
+  const filterParams: (number | string)[] = [organizationId];
+
+  if (!staffRoles.includes(roleCode)) {
+    conditions.push("t.customer_id = ?");
+    filterParams.push(userId);
+  }
+  if (query.search) {
+    conditions.push("(t.subject LIKE ? OR t.description LIKE ?)");
+    const searchPattern = `%${query.search}%`;
+    filterParams.push(searchPattern, searchPattern);
+  }
+  if (query.status) {
+    conditions.push("t.status = ?");
+    filterParams.push(query.status);
+  }
+  if (query.priority) {
+    conditions.push("t.priority = ?");
+    filterParams.push(query.priority);
+  }
+  if (query.teamId) {
+    conditions.push("t.team_id = ?");
+    filterParams.push(query.teamId);
+  }
+  if (query.assigneeId) {
+    conditions.push("t.assignee_id = ?");
+    filterParams.push(query.assigneeId);
+  }
+
+  const whereClause = conditions.join(" AND ");
+  const offset = (query.page - 1) * query.limit;
   const [rows] = await pool.query(
     `
       SELECT t.id, t.organization_id AS organizationId, t.customer_id AS customerId,
         t.team_id AS teamId, t.assignee_id AS assigneeId, t.subject, t.description,
         t.status, t.priority, t.created_at AS createdAt, t.updated_at AS updatedAt
       FROM tickets t
-      WHERE t.organization_id = ?${customerFilter}
+      WHERE ${whereClause}
       ORDER BY t.id DESC
+      LIMIT ? OFFSET ?
     `,
-    params
+    [...filterParams, query.limit, offset]
   );
-  return rows;
+
+  const [countRows] = await pool.query(
+    `SELECT COUNT(*) AS total FROM tickets t WHERE ${whereClause}`,
+    filterParams
+  );
+  const total = Number((countRows as { total: number }[])[0]?.total ?? 0);
+
+  return {
+    tickets: rows,
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit)
+    }
+  };
 };
 
 export const getTicketById = async (ticketId: number, organizationId: number, userId: number, isStaff: boolean) => {
@@ -131,6 +194,17 @@ export const updateTicketStatus = async (
   } catch (error) {
     console.error("Ticket status notification failed:", error);
   }
+  try {
+    await createAuditLog(organizationId, {
+      actorId,
+      action: "TICKET_STATUS_CHANGED",
+      entityType: "TICKET",
+      entityId: ticketId,
+      metadata: { status }
+    });
+  } catch (error) {
+    console.error("Ticket status audit failed:", error);
+  }
 };
 
 export const assignTicket = async (
@@ -180,6 +254,17 @@ export const assignTicket = async (
       } catch (error) {
         console.error("Ticket assignment notification failed:", error);
       }
+    }
+    try {
+      await createAuditLog(organizationId, {
+        actorId: assignedBy,
+        action: "TICKET_ASSIGNED",
+        entityType: "TICKET",
+        entityId: ticketId,
+        metadata: { teamId: input.teamId, assigneeId: input.assigneeId }
+      });
+    } catch (error) {
+      console.error("Ticket assignment audit failed:", error);
     }
   } catch (error) {
     await connection.rollback();

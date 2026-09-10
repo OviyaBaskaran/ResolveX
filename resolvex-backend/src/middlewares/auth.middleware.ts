@@ -12,6 +12,10 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
 
   try {
     const payload = verifyAccessToken(token);
+    if ("tokenType" in payload && payload.tokenType === "PLATFORM_ADMIN") {
+      res.status(403).json({ success: false, message: "Platform token cannot access organization APIs", code: "WRONG_TOKEN_TYPE" });
+      return;
+    }
     req.user = {
       id: Number(payload.sub),
       name: payload.name,

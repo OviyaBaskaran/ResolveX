@@ -8,6 +8,9 @@ import teamRoutes from "./routes/team.routes.js";
 import ticketRoutes from "./routes/ticket.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import slaRoutes from "./routes/sla.routes.js";
+import auditLogRoutes from "./routes/audit-log.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
+import platformRoutes from "./routes/platform.routes.js";
 
 const app = express();
 
@@ -21,4 +24,7 @@ app.use("/api/v1/teams", teamRoutes);
 app.use("/api/v1/tickets", ticketRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/sla", slaRoutes);
+app.use("/api/v1/audit-logs", auditLogRoutes);
+app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/platform", platformRoutes);
 export default app;
