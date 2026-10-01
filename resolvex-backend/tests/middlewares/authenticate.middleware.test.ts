@@ -1,36 +1,54 @@
-import request from "supertest";
+import express from "express";
 import jwt from "jsonwebtoken";
+import request from "supertest";
 
-import app from "../../src/app.js";
 import { env } from "../../src/config/env.js";
+import { authenticate } from "../../src/middlewares/authenticate.middleware.js";
 
-describe("Organization authentication middleware", () => {
-  function createAccessToken(
-    overrides: Partial<{
-      sub: string;
-      organizationId: number;
-      role: string;
-      type: string;
-    }> = {},
-  ): string {
-    return jwt.sign(
-      {
-        sub: "1",
-        organizationId: 10,
-        role: "CUSTOMER",
-        type: "ORG_ACCESS",
-        ...overrides,
-      },
-      env.jwt.accessSecret,
-      {
-        expiresIn: "30m",
-      },
-    );
-  }
+function createTestApp() {
+  const app = express();
 
+  app.get(
+    "/protected",
+    authenticate,
+    (req, res) => {
+      res.status(200).json({
+        success: true,
+        user: req.user,
+      });
+    },
+  );
+
+  return app;
+}
+
+function createAccessToken(
+  overrides: Partial<{
+    sub: string;
+    organizationId: number;
+    role: string;
+    type: "ORG_ACCESS" | "PLATFORM_ADMIN";
+  }> = {},
+): string {
+  return jwt.sign(
+    {
+      sub: "1",
+      organizationId: 10,
+      role: "CUSTOMER",
+      type: "ORG_ACCESS",
+      ...overrides,
+    },
+    env.jwt.accessSecret,
+    {
+      expiresIn: "30m",
+    },
+  );
+}
+
+describe("authenticate middleware", () => {
   it("returns 401 when Authorization header is missing", async () => {
-    const response = await request(app)
-      .get("/api/v1/test/protected");
+    const response = await request(createTestApp())
+      .get("/protected");
 
     expect(response.status).toBe(401);
 
@@ -40,9 +58,9 @@ describe("Organization authentication middleware", () => {
     });
   });
 
-  it("returns 401 when Authorization header is invalid", async () => {
-    const response = await request(app)
-      .get("/api/v1/test/protected")
+  it("returns 401 when Authorization scheme is not Bearer", async () => {
+    const response = await request(createTestApp())
+      .get("/protected")
       .set("Authorization", "Basic abc123");
 
     expect(response.status).toBe(401);
@@ -53,9 +71,22 @@ describe("Organization authentication middleware", () => {
     });
   });
 
+  it("returns 401 when Bearer token is missing", async () => {
+    const response = await request(createTestApp())
+      .get("/protected")
+      .set("Authorization", "Bearer");
+
+    expect(response.status).toBe(401);
+
+    expect(response.body).toEqual({
+      success: false,
+      message: "Invalid authorization header",
+    });
+  });
+
   it("returns 401 when access token is invalid", async () => {
-    const response = await request(app)
-      .get("/api/v1/test/protected")
+    const response = await request(createTestApp())
+      .get("/protected")
       .set(
         "Authorization",
         "Bearer invalid-token",
@@ -74,8 +105,8 @@ describe("Organization authentication middleware", () => {
       type: "PLATFORM_ADMIN",
     });
 
-    const response = await request(app)
-      .get("/api/v1/test/protected")
+    const response = await request(createTestApp())
+      .get("/protected")
       .set(
         "Authorization",
         `Bearer ${token}`,
@@ -89,7 +120,7 @@ describe("Organization authentication middleware", () => {
     });
   });
 
-  it("returns 401 when token is expired", async () => {
+  it("returns 401 when access token is expired", async () => {
     const token = jwt.sign(
       {
         sub: "1",
@@ -103,8 +134,8 @@ describe("Organization authentication middleware", () => {
       },
     );
 
-    const response = await request(app)
-      .get("/api/v1/test/protected")
+    const response = await request(createTestApp())
+      .get("/protected")
       .set(
         "Authorization",
         `Bearer ${token}`,
@@ -121,8 +152,8 @@ describe("Organization authentication middleware", () => {
   it("accepts a valid organization access token", async () => {
     const token = createAccessToken();
 
-    const response = await request(app)
-      .get("/api/v1/test/protected")
+    const response = await request(createTestApp())
+      .get("/protected")
       .set(
         "Authorization",
         `Bearer ${token}`,

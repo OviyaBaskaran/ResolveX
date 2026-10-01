@@ -1,0 +1,9 @@
+export const ORGANIZATION_ROLES = {
+  CUSTOMER: "CUSTOMER",
+  SUPPORT_AGENT: "SUPPORT_AGENT",
+  MANAGER: "MANAGER",
+  ORGANIZATION_ADMIN: "ORGANIZATION_ADMIN",
+} as const;
+
+export type OrganizationRole =
+  (typeof ORGANIZATION_ROLES)[keyof typeof ORGANIZATION_ROLES];
