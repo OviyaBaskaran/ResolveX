@@ -5,6 +5,7 @@ module.exports = {
   roots: ["<rootDir>/tests"],
   clearMocks: true,
   extensionsToTreatAsEsm: [".ts"],
+  setupFilesAfterEnv: ["<rootDir>/tests/setup.ts"],
   transform: {
     "^.+\\.ts$": [
       "ts-jest",

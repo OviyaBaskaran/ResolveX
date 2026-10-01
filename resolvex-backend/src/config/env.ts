@@ -1,5 +1,8 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+
 import { z } from "zod";
+
+dotenv.config({ quiet: true });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -18,7 +21,11 @@ const envSchema = z.object({
   ACCESS_TOKEN_EXPIRES_IN: z.string().min(1),
   REFRESH_TOKEN_EXPIRES_IN: z.string().min(1),
 
-  FRONTEND_URL: z.string().url(),
+  FRONTEND_URL: z.url(),
+
+  PLATFORM_ADMIN_NAME: z.string().min(1),
+  PLATFORM_ADMIN_EMAIL: z.email(),
+  PLATFORM_ADMIN_PASSWORD: z.string().min(8),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -30,6 +37,7 @@ if (!parsedEnv.success) {
 
 export const env = {
   nodeEnv: parsedEnv.data.NODE_ENV,
+
   port: parsedEnv.data.PORT,
 
   db: {
@@ -48,4 +56,10 @@ export const env = {
   },
 
   frontendUrl: parsedEnv.data.FRONTEND_URL,
+
+  platformAdmin: {
+    name: parsedEnv.data.PLATFORM_ADMIN_NAME,
+    email: parsedEnv.data.PLATFORM_ADMIN_EMAIL,
+    password: parsedEnv.data.PLATFORM_ADMIN_PASSWORD,
+  },
 };
